@@ -1,0 +1,86 @@
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error
+from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
+import matplotlib.pyplot as plt
+
+# 1. Simulasi data seperti jurnal
+np.random.seed(0)
+n_samples = 9180
+amplitude_y = np.random.uniform(0.01, 0.7, n_samples)
+amplitude_z = np.random.uniform(0.01, 0.7, n_samples)
+growth_rate = np.random.choice([0.01, 0.02, 0.05], n_samples)
+
+# Fungsi estimasi waktu kegagalan
+def failure_time(ay, az, gr, ay_lim=0.7, az_lim=0.7):
+    fty = (ay_lim - ay) / (ay * gr)
+    ftz = (az_lim - az) / (az * gr)
+    return (fty + ftz) / 2
+
+failure = failure_time(amplitude_y, amplitude_z, growth_rate)
+
+# 2. Dataset
+X = np.vstack([amplitude_y, amplitude_z, growth_rate]).T
+y = failure
+
+# 3. Normalisasi
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# 4. Split data
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+# 5. MLP dengan 2 hidden layer (CPMK 4)
+mlp = MLPRegressor(hidden_layer_sizes=(32, 16),   # 2 hidden layers
+                   activation='relu',
+                   solver='adam',
+                   learning_rate_init=0.01,
+                   max_iter=50000,
+                   random_state=42)
+
+mlp.fit(X_train, y_train)
+y_pred_mlp = mlp.predict(X_test)
+rmse_mlp = np.sqrt(mean_squared_error(y_test, y_pred_mlp))
+print("✅ ANN (2-layer MLP) RMSE:", rmse_mlp)
+
+# 6. Bandingkan dengan RF dan SVM
+rf = RandomForestRegressor(n_estimators=500, max_features=3,
+                           min_samples_leaf=5, random_state=42)
+rf.fit(X_train, y_train)
+y_pred_rf = rf.predict(X_test)
+rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred_rf))
+print(" Random Forest RMSE:", rmse_rf)
+
+svm = SVR(kernel='rbf', C=10, gamma=10, epsilon=0.0005)
+svm.fit(X_train, y_train)
+y_pred_svm = svm.predict(X_test)
+rmse_svm = np.sqrt(mean_squared_error(y_test, y_pred_svm))
+print(" Support Vector Machine RMSE:", rmse_svm)
+
+# 7. Visualisasi prediksi vs aktual
+plt.figure(figsize=(12, 4))
+
+plt.subplot(1, 3, 1)
+plt.scatter(y_test[:100], y_pred_mlp[:100], alpha=0.7)
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--')
+plt.title(f'MLP (RMSE={rmse_mlp:.2f})')
+plt.xlabel('Aktual'); plt.ylabel('Prediksi'); plt.grid(True)
+
+plt.subplot(1, 3, 2)
+plt.scatter(y_test[:100], y_pred_rf[:100], alpha=0.7)
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--')
+plt.title(f'RF (RMSE={rmse_rf:.2f})')
+plt.xlabel('Aktual'); plt.ylabel('Prediksi'); plt.grid(True)
+
+plt.subplot(1, 3, 3)
+plt.scatter(y_test[:100], y_pred_svm[:100], alpha=0.7)
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--')
+plt.title(f'SVM (RMSE={rmse_svm:.2f})')
+plt.xlabel('Aktual'); plt.ylabel('Prediksi'); plt.grid(True)
+
+plt.suptitle("Perbandingan Prediksi Waktu Kegagalan Motor (CPMK 4)")
+plt.tight_layout()
+plt.show()
