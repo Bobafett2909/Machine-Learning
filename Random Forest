@@ -1,0 +1,57 @@
+# ============================================================
+# Random Forest (RF) untuk Prediksi Waktu Kegagalan Motor
+# ============================================================
+
+# 1. Import library
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
+
+# 2. Simulasi data sesuai jurnal
+np.random.seed(0)
+n_samples = 9180
+ay = np.random.uniform(0.01, 0.7, n_samples)         # amplitude Y
+az = np.random.uniform(0.01, 0.7, n_samples)         # amplitude Z
+gr = np.random.choice([0.01, 0.02, 0.05], n_samples) # growth rate
+
+def failure_time(ay, az, gr, ay_lim=0.7, az_lim=0.7):
+    return 0.5 * (((ay_lim - ay) / (ay * gr)) + ((az_lim - az) / (az * gr)))
+
+y = failure_time(ay, az, gr)
+X = np.vstack([ay, az, gr]).T
+
+# 3. Normalisasi & split data
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42)
+
+# 4. Random Forest training
+rf = RandomForestRegressor(
+        n_estimators=500,
+        max_features=3,
+        min_samples_leaf=5,
+        random_state=42)
+
+rf.fit(X_train, y_train)
+
+# 5. Prediksi & evaluasi
+y_pred = rf.predict(X_test)
+rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred))
+print(f"✅ Random Forest RMSE: {rmse_rf:.2f}")
+
+# 6. Visualisasi 100 titik pertama
+plt.figure(figsize=(6, 5))
+plt.scatter(y_test[:100], y_pred[:100], alpha=0.7, color='darkgreen')
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()],
+         'r--', label='Ideal')
+plt.xlabel('Waktu Kegagalan Aktual (detik)')
+plt.ylabel('Prediksi RF (detik)')
+plt.title(f'Random Forest Prediction\nRMSE = {rmse_rf:.2f}')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
